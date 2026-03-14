@@ -195,7 +195,6 @@ func ValidateMultipartDirect(c *gin.Context, info *RelayInfo) *dto.TaskError {
 		}
 	}
 
-	info.Action = action
 	storeTaskRequest(c, info, action, req)
 
 	return nil

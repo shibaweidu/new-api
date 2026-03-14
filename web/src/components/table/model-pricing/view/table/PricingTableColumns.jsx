@@ -24,6 +24,7 @@ import {
   renderModelTag,
   stringToColor,
   calculateModelPrice,
+  getModelPriceItems,
   getLobeHubIcon,
 } from '../../../../../helpers';
 import {
@@ -115,6 +116,7 @@ export const getPricingTableColumns = ({
   setModalImageUrl,
   setIsModalOpenurl,
   currency,
+  siteDisplayType,
   tokenUnit,
   displayPrice,
   showRatio,
@@ -132,6 +134,7 @@ export const getPricingTableColumns = ({
         tokenUnit,
         displayPrice,
         currency,
+        quotaDisplayType: siteDisplayType,
       });
       priceDataCache.set(record, cache);
     }
@@ -236,31 +239,23 @@ export const getPricingTableColumns = ({
   };
 
   const priceColumn = {
-    title: t('模型价格'),
+    title: siteDisplayType === 'TOKENS' ? t('计费摘要') : t('模型价格'),
     dataIndex: 'model_price',
     ...(isMobile ? {} : { fixed: 'right' }),
     render: (text, record, index) => {
       const priceData = getPriceData(record);
+      const priceItems = getModelPriceItems(priceData, t, siteDisplayType);
 
-      if (priceData.isPerToken) {
-        return (
-          <div className='space-y-1'>
-            <div className='text-gray-700'>
-              {t('输入')} {priceData.inputPrice} / 1{priceData.unitLabel} tokens
+      return (
+        <div className='space-y-1'>
+          {priceItems.map((item) => (
+            <div key={item.key} className='text-gray-700'>
+              {item.label} {item.value}
+              {item.suffix}
             </div>
-            <div className='text-gray-700'>
-              {t('输出')} {priceData.completionPrice} / 1{priceData.unitLabel}{' '}
-              tokens
-            </div>
-          </div>
-        );
-      } else {
-        return (
-          <div className='text-gray-700'>
-            {t('模型价格')}：{priceData.price}
-          </div>
-        );
-      }
+          ))}
+        </div>
+      );
     },
   };
 

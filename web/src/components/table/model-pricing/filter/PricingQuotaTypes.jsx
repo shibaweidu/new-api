@@ -58,6 +58,7 @@ const PricingQuotaTypes = ({
       activeValue={filterQuotaType}
       onChange={setFilterQuotaType}
       loading={loading}
+      variant='amber'
       t={t}
     />
   );
