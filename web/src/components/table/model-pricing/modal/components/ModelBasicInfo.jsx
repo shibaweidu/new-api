@@ -57,6 +57,9 @@ const ModelBasicInfo = ({ modelData, vendorsMap = {}, t }) => {
     return tags;
   };
 
+  const hasTaskTierPricing =
+    modelData?.group_task_prices && Object.keys(modelData.group_task_prices).length > 0;
+
   return (
     <Card className='!rounded-2xl shadow-sm border-0 mb-6'>
       <div className='flex items-center mb-4'>
@@ -80,6 +83,16 @@ const ModelBasicInfo = ({ modelData, vendorsMap = {}, t }) => {
               </Tag>
             ))}
           </Space>
+        )}
+        {hasTaskTierPricing && (
+          <div className='mt-4 rounded-xl border border-cyan-200 bg-cyan-50 p-4'>
+            <div className='font-medium text-cyan-900 mb-2'>
+              {t('Sora-2 计费介绍')}
+            </div>
+            <div className='text-sm text-cyan-800 leading-6'>
+              {t('支持固定分辨率视频生成，可选竖屏 720x1280 或横屏 1280x720，时长支持 4s、8s、12s。上传参考图时会自动补边适配到所选分辨率，优先保留完整内容。实际扣费按所选时长、画幅和当前分组价格计算。')}
+            </div>
+          </div>
         )}
       </div>
     </Card>

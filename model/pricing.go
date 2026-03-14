@@ -23,6 +23,8 @@ type Pricing struct {
 	QuotaType              int                     `json:"quota_type"`
 	ModelRatio             float64                 `json:"model_ratio"`
 	ModelPrice             float64                 `json:"model_price"`
+	GroupImagePrices       map[string]map[string]float64 `json:"group_image_prices,omitempty"`
+	GroupTaskPrices        map[string]map[string]float64 `json:"group_task_prices,omitempty"`
 	OwnerBy                string                  `json:"owner_by"`
 	CompletionRatio        float64                 `json:"completion_ratio"`
 	EnableGroup            []string                `json:"enable_groups"`
@@ -268,6 +270,8 @@ func updatePricing() {
 			ModelName:              model,
 			EnableGroup:            groups.Items(),
 			SupportedEndpointTypes: modelSupportEndpointTypes[model],
+			GroupImagePrices:       ratio_setting.GetGroupImagePricesForModel(model),
+			GroupTaskPrices:        ratio_setting.GetGroupTaskPricesForModel(model),
 		}
 
 		// 补充模型元数据（描述、标签、供应商、状态）
@@ -282,7 +286,8 @@ func updatePricing() {
 			pricing.VendorID = meta.VendorID
 		}
 		modelPrice, findPrice := ratio_setting.GetModelPrice(model, false)
-		if findPrice {
+		_, findTaskPrice := ratio_setting.GetGroupTaskModelLowestPrice("default", model)
+		if findPrice || findTaskPrice {
 			pricing.ModelPrice = modelPrice
 			pricing.QuotaType = 1
 		} else {

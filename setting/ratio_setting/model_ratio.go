@@ -321,6 +321,21 @@ var (
 	modelPriceMap      map[string]float64 = nil
 	modelPriceMapMutex                    = sync.RWMutex{}
 )
+
+var defaultGroupImageModelPrice = map[string]map[string]map[string]float64{}
+
+var defaultGroupTaskModelPrice = map[string]map[string]map[string]float64{}
+
+var (
+	groupImageModelPriceMap      map[string]map[string]map[string]float64 = nil
+	groupImageModelPriceMapMutex                                          = sync.RWMutex{}
+)
+
+var (
+	groupTaskModelPriceMap      map[string]map[string]map[string]float64 = nil
+	groupTaskModelPriceMapMutex                                         = sync.RWMutex{}
+)
+
 var (
 	modelRatioMap      map[string]float64 = nil
 	modelRatioMapMutex                    = sync.RWMutex{}
@@ -344,6 +359,14 @@ func InitRatioSettings() {
 	modelPriceMapMutex.Lock()
 	modelPriceMap = defaultModelPrice
 	modelPriceMapMutex.Unlock()
+
+	groupImageModelPriceMapMutex.Lock()
+	groupImageModelPriceMap = defaultGroupImageModelPrice
+	groupImageModelPriceMapMutex.Unlock()
+
+	groupTaskModelPriceMapMutex.Lock()
+	groupTaskModelPriceMap = defaultGroupTaskModelPrice
+	groupTaskModelPriceMapMutex.Unlock()
 
 	// Initialize modelRatioMap
 	modelRatioMapMutex.Lock()
@@ -393,6 +416,17 @@ func ModelPrice2JSONString() string {
 	return string(jsonBytes)
 }
 
+func GroupImageModelPrice2JSONString() string {
+	groupImageModelPriceMapMutex.RLock()
+	defer groupImageModelPriceMapMutex.RUnlock()
+
+	jsonBytes, err := common.Marshal(groupImageModelPriceMap)
+	if err != nil {
+		common.SysError("error marshalling group image model price: " + err.Error())
+	}
+	return string(jsonBytes)
+}
+
 func UpdateModelPriceByJSONString(jsonStr string) error {
 	modelPriceMapMutex.Lock()
 	defer modelPriceMapMutex.Unlock()
@@ -402,6 +436,41 @@ func UpdateModelPriceByJSONString(jsonStr string) error {
 		InvalidateExposedDataCache()
 	}
 	return err
+}
+
+func UpdateGroupImageModelPriceByJSONString(jsonStr string) error {
+	tmp := make(map[string]map[string]map[string]float64)
+	if err := common.Unmarshal([]byte(jsonStr), &tmp); err != nil {
+		return err
+	}
+	groupImageModelPriceMapMutex.Lock()
+	groupImageModelPriceMap = tmp
+	groupImageModelPriceMapMutex.Unlock()
+	InvalidateExposedDataCache()
+	return nil
+}
+
+func GroupTaskModelPrice2JSONString() string {
+	groupTaskModelPriceMapMutex.RLock()
+	defer groupTaskModelPriceMapMutex.RUnlock()
+
+	jsonBytes, err := common.Marshal(groupTaskModelPriceMap)
+	if err != nil {
+		common.SysError("error marshalling group task model price: " + err.Error())
+	}
+	return string(jsonBytes)
+}
+
+func UpdateGroupTaskModelPriceByJSONString(jsonStr string) error {
+	tmp := make(map[string]map[string]map[string]float64)
+	if err := common.Unmarshal([]byte(jsonStr), &tmp); err != nil {
+		return err
+	}
+	groupTaskModelPriceMapMutex.Lock()
+	groupTaskModelPriceMap = tmp
+	groupTaskModelPriceMapMutex.Unlock()
+	InvalidateExposedDataCache()
+	return nil
 }
 
 // GetModelPrice 返回模型的价格，如果模型不存在则返回-1，false
@@ -430,6 +499,185 @@ func GetModelPrice(name string, printErr bool) (float64, bool) {
 		return -1, false
 	}
 	return price, true
+}
+
+func normalizeImageSize(size string) string {
+	size = strings.ToLower(strings.TrimSpace(size))
+	if size == "" {
+		return "1024x1024"
+	}
+	return size
+}
+
+func getGroupImageModelPriceFromGroup(group, model, size string) (float64, bool) {
+	modelMap, ok := groupImageModelPriceMap[group]
+	if !ok {
+		return 0, false
+	}
+	priceMap, ok := modelMap[model]
+	if !ok {
+		return 0, false
+	}
+	if price, ok := priceMap[size]; ok {
+		return price, true
+	}
+	price, ok := priceMap["*"]
+	return price, ok
+}
+
+func GetGroupImageModelPrice(group, model, size string) (float64, bool) {
+	groupImageModelPriceMapMutex.RLock()
+	defer groupImageModelPriceMapMutex.RUnlock()
+
+	model = FormatMatchingModelName(model)
+	size = normalizeImageSize(size)
+	if price, ok := getGroupImageModelPriceFromGroup(group, model, size); ok {
+		return price, true
+	}
+	return getGroupImageModelPriceFromGroup("default", model, size)
+}
+
+func GetGroupImagePricesForModel(model string) map[string]map[string]float64 {
+	groupImageModelPriceMapMutex.RLock()
+	defer groupImageModelPriceMapMutex.RUnlock()
+
+	formattedModel := FormatMatchingModelName(model)
+	result := make(map[string]map[string]float64)
+	for group, modelMap := range groupImageModelPriceMap {
+		var sizeMap map[string]float64
+		if exactMap, ok := modelMap[model]; ok {
+			sizeMap = exactMap
+		} else if wildcardMap, ok := modelMap[formattedModel]; ok {
+			sizeMap = wildcardMap
+		}
+		if len(sizeMap) == 0 {
+			continue
+		}
+		result[group] = make(map[string]float64, len(sizeMap))
+		for size, price := range sizeMap {
+			result[group][size] = price
+		}
+	}
+	return result
+}
+
+func getGroupTaskModelPriceFromGroup(group, model, variant string) (float64, bool) {
+	modelMap, ok := groupTaskModelPriceMap[group]
+	if !ok {
+		return 0, false
+	}
+	priceMap, ok := modelMap[model]
+	if !ok {
+		return 0, false
+	}
+	if price, ok := priceMap[variant]; ok {
+		return price, true
+	}
+	price, ok := priceMap["*"]
+	return price, ok
+}
+
+func GetGroupTaskModelPrice(group, model, variant string) (float64, bool) {
+	groupTaskModelPriceMapMutex.RLock()
+	defer groupTaskModelPriceMapMutex.RUnlock()
+
+	model = FormatMatchingModelName(model)
+	if price, ok := getGroupTaskModelPriceFromGroup(group, model, variant); ok {
+		return price, true
+	}
+	return getGroupTaskModelPriceFromGroup("default", model, variant)
+}
+
+func GetGroupTaskPricesForModel(model string) map[string]map[string]float64 {
+	groupTaskModelPriceMapMutex.RLock()
+	defer groupTaskModelPriceMapMutex.RUnlock()
+
+	formattedModel := FormatMatchingModelName(model)
+	result := make(map[string]map[string]float64)
+	for group, modelMap := range groupTaskModelPriceMap {
+		var variantMap map[string]float64
+		if exactMap, ok := modelMap[model]; ok {
+			variantMap = exactMap
+		} else if wildcardMap, ok := modelMap[formattedModel]; ok {
+			variantMap = wildcardMap
+		}
+		if len(variantMap) == 0 {
+			continue
+		}
+		result[group] = make(map[string]float64, len(variantMap))
+		for variant, price := range variantMap {
+			result[group][variant] = price
+		}
+	}
+	return result
+}
+
+func GetGroupTaskModelLowestPrice(group, model string) (float64, bool) {
+	groupTaskModelPriceMapMutex.RLock()
+	defer groupTaskModelPriceMapMutex.RUnlock()
+
+	formattedModel := FormatMatchingModelName(model)
+	groupsToCheck := []string{group}
+	if group != "default" {
+		groupsToCheck = append(groupsToCheck, "default")
+	}
+
+	lowestPrice := 0.0
+	found := false
+	for _, currentGroup := range groupsToCheck {
+		modelMap, ok := groupTaskModelPriceMap[currentGroup]
+		if !ok {
+			continue
+		}
+		priceMap, ok := modelMap[model]
+		if !ok {
+			priceMap, ok = modelMap[formattedModel]
+		}
+		if !ok {
+			continue
+		}
+		for _, price := range priceMap {
+			if !found || price < lowestPrice {
+				lowestPrice = price
+				found = true
+			}
+		}
+	}
+	return lowestPrice, found
+}
+
+func GetGroupImageModelLowestPrice(group, model string) (float64, bool) {
+	groupImageModelPriceMapMutex.RLock()
+	defer groupImageModelPriceMapMutex.RUnlock()
+
+	formattedModel := FormatMatchingModelName(model)
+	groupsToCheck := []string{group}
+	if group != "default" {
+		groupsToCheck = append(groupsToCheck, "default")
+	}
+
+	lowestPrice := 0.0
+	found := false
+	for _, currentGroup := range groupsToCheck {
+		modelMap, ok := groupImageModelPriceMap[currentGroup]
+		if !ok {
+			continue
+		}
+		priceMap, ok := modelMap[model]
+		if !ok {
+			priceMap, ok = modelMap[formattedModel]
+		}
+		if !ok {
+			continue
+		}
+		for _, price := range priceMap {
+			if !found || price < lowestPrice {
+				lowestPrice = price
+				found = true
+			}
+		}
+	}
+	return lowestPrice, found
 }
 
 func UpdateModelRatioByJSONString(jsonStr string) error {
@@ -484,6 +732,14 @@ func GetDefaultModelRatioMap() map[string]float64 {
 
 func GetDefaultModelPriceMap() map[string]float64 {
 	return defaultModelPrice
+}
+
+func GetDefaultGroupImageModelPriceMap() map[string]map[string]map[string]float64 {
+	return defaultGroupImageModelPrice
+}
+
+func GetDefaultGroupTaskModelPriceMap() map[string]map[string]map[string]float64 {
+	return defaultGroupTaskModelPrice
 }
 
 func GetDefaultImageRatioMap() map[string]float64 {

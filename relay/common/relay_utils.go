@@ -9,6 +9,7 @@ import (
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/constant"
 	"github.com/QuantumNous/new-api/dto"
+	"github.com/QuantumNous/new-api/setting/ratio_setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/samber/lo"
@@ -139,6 +140,8 @@ func ValidateMultipartDirect(c *gin.Context, info *RelayInfo) *dto.TaskError {
 	}
 	if req.InputReference != "" {
 		req.Images = []string{req.InputReference}
+	} else if len(req.Images) == 0 && strings.TrimSpace(req.Image) != "" {
+		req.Images = []string{req.Image}
 	}
 
 	if strings.TrimSpace(req.Model) == "" {
@@ -158,13 +161,15 @@ func ValidateMultipartDirect(c *gin.Context, info *RelayInfo) *dto.TaskError {
 		action = constant.TaskActionGenerate
 	}
 	if strings.HasPrefix(model, "sora-2") {
-
 		if size == "" {
 			size = "720x1280"
 		}
 
 		if seconds <= 0 {
 			seconds = 4
+		}
+		if !lo.Contains([]int{4, 8, 12}, seconds) {
+			return createTaskError(fmt.Errorf("sora-2 duration is invalid"), "invalid_duration", http.StatusBadRequest, true)
 		}
 
 		if model == "sora-2" && !lo.Contains([]string{"720x1280", "1280x720"}, size) {
@@ -173,6 +178,14 @@ func ValidateMultipartDirect(c *gin.Context, info *RelayInfo) *dto.TaskError {
 		if model == "sora-2-pro" && !lo.Contains([]string{"720x1280", "1280x720", "1792x1024", "1024x1792"}, size) {
 			return createTaskError(fmt.Errorf("sora-2 size is invalid"), "invalid_size", http.StatusBadRequest, true)
 		}
+		variant := fmt.Sprintf("%ds_%s", seconds, size)
+		if groupTaskPrice, ok := ratio_setting.GetGroupTaskModelPrice(info.UsingGroup, model, variant); ok {
+			info.PriceData.ModelPrice = groupTaskPrice
+			info.PriceData.UsePrice = true
+		}
+		req.Size = size
+		req.Duration = seconds
+		req.Seconds = strconv.Itoa(seconds)
 		info.PriceData.OtherRatios = map[string]float64{
 			"seconds": float64(seconds),
 			"size":    1,
@@ -183,6 +196,7 @@ func ValidateMultipartDirect(c *gin.Context, info *RelayInfo) *dto.TaskError {
 	}
 
 	info.Action = action
+	storeTaskRequest(c, info, action, req)
 
 	return nil
 }

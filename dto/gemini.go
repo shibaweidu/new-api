@@ -11,6 +11,47 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func normalizeGeminiImageSize(imageSize string) string {
+	switch strings.ToUpper(strings.TrimSpace(imageSize)) {
+	case "0.5K":
+		return "512x512"
+	case "1K", "":
+		return "1024x1024"
+	case "2K":
+		return "2048x2048"
+	case "4K":
+		return "4096x4096"
+	default:
+		return strings.ToLower(strings.TrimSpace(imageSize))
+	}
+}
+
+func getGeminiImageConfigSize(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var payload struct {
+		ImageSize      string `json:"imageSize,omitempty"`
+		ImageSizeSnake string `json:"image_size,omitempty"`
+	}
+	if err := common.Unmarshal(raw, &payload); err != nil {
+		return ""
+	}
+	if payload.ImageSize != "" {
+		return normalizeGeminiImageSize(payload.ImageSize)
+	}
+	return normalizeGeminiImageSize(payload.ImageSizeSnake)
+}
+
+func containsGeminiImageResponse(modalities []string) bool {
+	for _, modality := range modalities {
+		if strings.EqualFold(strings.TrimSpace(modality), "image") {
+			return true
+		}
+	}
+	return false
+}
+
 type GeminiChatRequest struct {
 	Requests           []GeminiChatRequest        `json:"requests,omitempty"` // For batch requests
 	Contents           []GeminiChatContent        `json:"contents"`
@@ -106,11 +147,23 @@ func (r *GeminiChatRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	}
 
 	inputText := strings.Join(inputTexts, "\n")
-	return &types.TokenCountMeta{
+	meta := &types.TokenCountMeta{
 		CombineText: inputText,
 		Files:       files,
 		MaxTokens:   maxTokens,
 	}
+	if containsGeminiImageResponse(r.GenerationConfig.ResponseModalities) {
+		meta.ImageSize = getGeminiImageConfigSize(r.GenerationConfig.ImageConfig)
+		if meta.ImageSize == "" {
+			meta.ImageSize = "1024x1024"
+		}
+		if r.GenerationConfig.CandidateCount > 0 {
+			meta.ImageCount = r.GenerationConfig.CandidateCount
+		} else {
+			meta.ImageCount = 1
+		}
+	}
+	return meta
 }
 
 func (r *GeminiChatRequest) IsStream(c *gin.Context) bool {

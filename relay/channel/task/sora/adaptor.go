@@ -2,6 +2,7 @@ package sora
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -104,11 +105,32 @@ func (a *TaskAdaptor) BuildRequestHeader(c *gin.Context, req *http.Request, info
 }
 
 func (a *TaskAdaptor) BuildRequestBody(c *gin.Context, info *relaycommon.RelayInfo) (io.Reader, error) {
-	cachedBody, err := common.GetRequestBody(c)
+	req, err := relaycommon.GetTaskRequest(c)
 	if err != nil {
-		return nil, errors.Wrap(err, "get_request_body_failed")
+		return nil, errors.Wrap(err, "get_task_request_failed")
 	}
-	return bytes.NewReader(cachedBody), nil
+	if len(req.Images) > 0 {
+		targetWidth, targetHeight, err := parseSoraTargetSize(req.Size)
+		if err != nil {
+			return nil, errors.Wrap(err, "parse_target_size_failed")
+		}
+		for index, imageValue := range req.Images {
+			normalizedImage, err := service.NormalizeImageForTarget(imageValue, targetWidth, targetHeight)
+			if err != nil {
+				return nil, errors.Wrap(err, fmt.Sprintf("normalize_image_failed_%d", index))
+			}
+			req.Images[index] = normalizedImage
+		}
+		if len(req.Images) > 0 {
+			req.InputReference = req.Images[0]
+			req.Image = req.Images[0]
+		}
+	}
+	data, err := json.Marshal(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal_request_failed")
+	}
+	return bytes.NewReader(data), nil
 }
 
 // DoRequest delegates to common helper.
@@ -212,4 +234,15 @@ func (a *TaskAdaptor) ParseTaskResult(respBody []byte) (*relaycommon.TaskInfo, e
 
 func (a *TaskAdaptor) ConvertToOpenAIVideo(task *model.Task) ([]byte, error) {
 	return task.Data, nil
+}
+
+func parseSoraTargetSize(size string) (int, int, error) {
+	var width, height int
+	if _, err := fmt.Sscanf(size, "%dx%d", &width, &height); err != nil {
+		return 0, 0, fmt.Errorf("invalid size: %s", size)
+	}
+	if width <= 0 || height <= 0 {
+		return 0, 0, fmt.Errorf("invalid size: %s", size)
+	}
+	return width, height, nil
 }

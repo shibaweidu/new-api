@@ -24,6 +24,149 @@ import { calculateModelPrice } from '../../../../../helpers';
 
 const { Text } = Typography;
 
+const SIZE_PRESET_MAP = {
+  '512x512': '0.5K',
+  '1024x1024': '1K',
+  '2048x2048': '2K',
+  '4096x4096': '4K',
+};
+
+const formatSizeTier = (size, t) => {
+  const normalized = String(size || '').trim().toLowerCase();
+  return SIZE_PRESET_MAP[normalized] || `${t('自定义')} (${normalized})`;
+};
+
+const resolveGroupImagePrices = (allPrices, group) => {
+  if (!allPrices) return null;
+  return allPrices[group] || allPrices.default || null;
+};
+
+const resolveGroupTaskPrices = (allPrices, group) => {
+  if (!allPrices) return null;
+  return allPrices[group] || allPrices.default || null;
+};
+
+const formatTaskVariantLabel = (variant, t) => {
+  const [durationPart = '4s', orientation = '720x1280'] = String(variant || '').split('_');
+  const duration = durationPart.endsWith('s') ? durationPart : `${durationPart}s`;
+  const orientationLabel = orientation === '1280x720' ? t('横屏') : t('竖屏');
+  return `${orientationLabel} ${orientation} / ${duration}`;
+};
+
+const ImagePriceTierTable = ({ prices, ratio, displayPrice, t }) => {
+  const rows = Object.entries(prices || {})
+    .map(([size, price]) => ({
+      key: size,
+      size,
+      finalPrice: (Number(price) || 0) * ratio,
+    }))
+    .sort((a, b) => a.finalPrice - b.finalPrice);
+
+  if (rows.length === 0) return <span>-</span>;
+
+  return (
+    <div
+      style={{
+        minWidth: 220,
+        border: '1px solid var(--semi-color-border)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        background: 'var(--semi-color-bg-0)',
+      }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1fr 1fr',
+          padding: '10px 14px',
+          background: 'var(--semi-color-fill-0)',
+          fontWeight: 600,
+          fontSize: 12,
+        }}
+      >
+        <span>{t('分辨率')}</span>
+        <span>{t('价格')}</span>
+      </div>
+      {rows.map((row, index) => (
+        <div
+          key={row.key}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1fr 1fr',
+            padding: '10px 14px',
+            borderTop:
+              index === 0 ? 'none' : '1px solid var(--semi-color-border)',
+            fontSize: 14,
+            alignItems: 'center',
+          }}
+        >
+          <span>{formatSizeTier(row.size, t)}</span>
+          <span style={{ color: 'var(--semi-color-warning)' }}>
+            ⚡ {displayPrice(row.finalPrice)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const TaskPriceTierTable = ({ prices, ratio, displayPrice, t }) => {
+  const rows = Object.entries(prices || {})
+    .map(([variant, price]) => ({
+      key: variant,
+      variant,
+      finalPrice: (Number(price) || 0) * ratio,
+    }))
+    .sort((a, b) => a.finalPrice - b.finalPrice);
+
+  if (rows.length === 0) return <span>-</span>;
+
+  return (
+    <div
+      style={{
+        minWidth: 260,
+        border: '1px solid var(--semi-color-border)',
+        borderRadius: 16,
+        overflow: 'hidden',
+        background: 'var(--semi-color-bg-0)',
+      }}
+    >
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: '1.6fr 1fr',
+          padding: '10px 14px',
+          background: 'var(--semi-color-fill-0)',
+          fontWeight: 600,
+          fontSize: 12,
+        }}
+      >
+        <span>{t('规格')}</span>
+        <span>{t('价格')}</span>
+      </div>
+      {rows.map((row, index) => (
+        <div
+          key={row.key}
+          style={{
+            display: 'grid',
+            gridTemplateColumns: '1.6fr 1fr',
+            padding: '10px 14px',
+            borderTop:
+              index === 0 ? 'none' : '1px solid var(--semi-color-border)',
+            fontSize: 14,
+            alignItems: 'center',
+          }}
+        >
+          <span>{formatTaskVariantLabel(row.variant, t)}</span>
+          <span style={{ color: 'var(--semi-color-warning)' }}>
+            ⚡ {displayPrice(row.finalPrice)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const ModelPricingTable = ({
   modelData,
   groupRatio,
@@ -39,6 +182,12 @@ const ModelPricingTable = ({
     ? modelData.enable_groups
     : [];
   const autoChain = autoGroups.filter((g) => modelEnableGroups.includes(g));
+  const hasImageResolutionPricing =
+    modelData?.group_image_prices &&
+    Object.keys(modelData.group_image_prices).length > 0;
+  const hasTaskTierPricing =
+    modelData?.group_task_prices &&
+    Object.keys(modelData.group_task_prices).length > 0;
   const renderGroupPriceTable = () => {
     // 仅展示模型可用的分组：模型 enable_groups 与用户可用分组的交集
 
@@ -49,6 +198,14 @@ const ModelPricingTable = ({
 
     // 准备表格数据
     const tableData = availableGroups.map((group) => {
+      const groupRatioValue =
+        groupRatio && groupRatio[group] ? groupRatio[group] : 1;
+      const imagePrices = hasImageResolutionPricing
+        ? resolveGroupImagePrices(modelData?.group_image_prices, group)
+        : null;
+      const taskPrices = hasTaskTierPricing
+        ? resolveGroupTaskPrices(modelData?.group_task_prices, group)
+        : null;
       const priceData = modelData
         ? calculateModelPrice({
             record: modelData,
@@ -60,20 +217,22 @@ const ModelPricingTable = ({
           })
         : { inputPrice: '-', outputPrice: '-', price: '-' };
 
-      // 获取分组倍率
-      const groupRatioValue =
-        groupRatio && groupRatio[group] ? groupRatio[group] : 1;
-
       return {
         key: group,
         group: group,
         ratio: groupRatioValue,
         billingType:
-          modelData?.quota_type === 0
+          imagePrices
+            ? t('按次计费')
+            : taskPrices
+              ? t('按时计费')
+            : modelData?.quota_type === 0
             ? t('按量计费')
             : modelData?.quota_type === 1
               ? t('按次计费')
               : '-',
+        imagePrices,
+        taskPrices,
         inputPrice: modelData?.quota_type === 0 ? priceData.inputPrice : '-',
         outputPrice:
           modelData?.quota_type === 0
@@ -118,6 +277,7 @@ const ModelPricingTable = ({
         let color = 'white';
         if (text === t('按量计费')) color = 'violet';
         else if (text === t('按次计费')) color = 'teal';
+        else if (text === t('按时计费')) color = 'cyan';
         return (
           <Tag color={color} size='small' shape='circle'>
             {text || '-'}
@@ -127,7 +287,33 @@ const ModelPricingTable = ({
     });
 
     // 根据计费类型添加价格列
-    if (modelData?.quota_type === 0) {
+    if (hasTaskTierPricing) {
+      columns.push({
+        title: t('价格'),
+        dataIndex: 'taskPrices',
+        render: (value, record) => (
+          <TaskPriceTierTable
+            prices={value}
+            ratio={record.ratio}
+            displayPrice={displayPrice}
+            t={t}
+          />
+        ),
+      });
+    } else if (hasImageResolutionPricing) {
+      columns.push({
+        title: t('价格'),
+        dataIndex: 'imagePrices',
+        render: (value, record) => (
+          <ImagePriceTierTable
+            prices={value}
+            ratio={record.ratio}
+            displayPrice={displayPrice}
+            t={t}
+          />
+        ),
+      });
+    } else if (modelData?.quota_type === 0) {
       // 按量计费
       columns.push(
         {
@@ -207,6 +393,16 @@ const ModelPricingTable = ({
               {idx < autoChain.length - 1 && <span className='text-sm'>→</span>}
             </React.Fragment>
           ))}
+        </div>
+      )}
+      {hasImageResolutionPricing && (
+        <div className='mb-4 text-xs text-gray-600'>
+          {t('模型会自动识别用户选择的图片比例和分辨率，并按当前分组命中的尺寸档位价格扣费。')}
+        </div>
+      )}
+      {hasTaskTierPricing && (
+        <div className='mb-4 text-xs text-gray-600'>
+          {t('模型按固定视频规格计费。当前支持横屏与竖屏，分辨率固定，时长可选 4s、8s、12s。参考图会自动补边适配到所选规格，优先保留完整内容。')}
         </div>
       )}
       {renderGroupPriceTable()}

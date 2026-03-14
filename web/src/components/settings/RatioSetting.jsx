@@ -22,9 +22,11 @@ import { Card, Spin, Tabs } from '@douyinfe/semi-ui';
 import { useTranslation } from 'react-i18next';
 
 import GroupRatioSettings from '../../pages/Setting/Ratio/GroupRatioSettings';
+import ImageGroupPriceSettings from '../../pages/Setting/Ratio/ImageGroupPriceSettings';
 import ModelRatioSettings from '../../pages/Setting/Ratio/ModelRatioSettings';
 import ModelSettingsVisualEditor from '../../pages/Setting/Ratio/ModelSettingsVisualEditor';
 import ModelRatioNotSetEditor from '../../pages/Setting/Ratio/ModelRationNotSetEditor';
+import TaskGroupPriceSettings from '../../pages/Setting/Ratio/TaskGroupPriceSettings';
 import UpstreamRatioSync from '../../pages/Setting/Ratio/UpstreamRatioSync';
 
 import { API, showError, toBoolean } from '../../helpers';
@@ -39,6 +41,8 @@ const RatioSetting = () => {
     CompletionRatio: '',
     GroupRatio: '',
     GroupGroupRatio: '',
+    GroupImageModelPrice: '',
+    GroupTaskModelPrice: '',
     ImageRatio: '',
     AudioRatio: '',
     AudioCompletionRatio: '',
@@ -104,6 +108,12 @@ const RatioSetting = () => {
           </Tabs.TabPane>
           <Tabs.TabPane tab={t('分组倍率设置')} itemKey='group'>
             <GroupRatioSettings options={inputs} refresh={onRefresh} />
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={t('图片分组按次定价')} itemKey='group_image_price'>
+            <ImageGroupPriceSettings options={inputs} refresh={onRefresh} />
+          </Tabs.TabPane>
+          <Tabs.TabPane tab={t('任务分组按时定价')} itemKey='group_task_price'>
+            <TaskGroupPriceSettings options={inputs} refresh={onRefresh} />
           </Tabs.TabPane>
           <Tabs.TabPane tab={t('可视化倍率设置')} itemKey='visual'>
             <ModelSettingsVisualEditor options={inputs} refresh={onRefresh} />

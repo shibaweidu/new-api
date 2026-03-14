@@ -46,9 +46,32 @@ func HandleGroupRatio(ctx *gin.Context, relayInfo *relaycommon.RelayInfo) types.
 }
 
 func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens int, meta *types.TokenCountMeta) (types.PriceData, error) {
-	modelPrice, usePrice := ratio_setting.GetModelPrice(info.OriginModelName, false)
-
 	groupRatioInfo := HandleGroupRatio(c, info)
+	modelPrice, usePrice := ratio_setting.GetModelPrice(info.OriginModelName, false)
+	imagePriceRatio := 0.0
+	imageCount := 1
+	imageSize := ""
+	if meta != nil {
+		imagePriceRatio = meta.ImagePriceRatio
+		imageSize = meta.ImageSize
+		if meta.ImageCount > 0 {
+			imageCount = meta.ImageCount
+		}
+	}
+	if meta != nil && (meta.ImageSize != "" || meta.ImageCount > 0 || meta.ImagePriceRatio != 0) {
+		if imagePrice, ok := ratio_setting.GetGroupImageModelPrice(info.UsingGroup, info.OriginModelName, imageSize); ok {
+			modelPrice = imagePrice * float64(imageCount)
+			usePrice = true
+			imagePriceRatio = 0
+		}
+	}
+	if !usePrice {
+		if fallbackImagePrice, ok := ratio_setting.GetGroupImageModelLowestPrice(info.UsingGroup, info.OriginModelName); ok {
+			modelPrice = fallbackImagePrice * float64(imageCount)
+			usePrice = true
+			imagePriceRatio = 0
+		}
+	}
 
 	var preConsumedQuota int
 	var modelRatio float64
@@ -90,8 +113,8 @@ func ModelPriceHelper(c *gin.Context, info *relaycommon.RelayInfo, promptTokens 
 		ratio := modelRatio * groupRatioInfo.GroupRatio
 		preConsumedQuota = int(float64(preConsumedTokens) * ratio)
 	} else {
-		if meta.ImagePriceRatio != 0 {
-			modelPrice = modelPrice * meta.ImagePriceRatio
+		if imagePriceRatio != 0 {
+			modelPrice = modelPrice * imagePriceRatio
 		}
 		preConsumedQuota = int(modelPrice * common.QuotaPerUnit * groupRatioInfo.GroupRatio)
 	}
@@ -164,6 +187,10 @@ func ModelPriceHelperPerCall(c *gin.Context, info *relaycommon.RelayInfo) types.
 
 func ContainPriceOrRatio(modelName string) bool {
 	_, ok := ratio_setting.GetModelPrice(modelName, false)
+	if ok {
+		return true
+	}
+	_, ok = ratio_setting.GetGroupImageModelLowestPrice("default", modelName)
 	if ok {
 		return true
 	}

@@ -51,6 +51,13 @@ function renderQuotaType(type, t) {
   }
 }
 
+function hasTierPricing(record) {
+  return (
+    (record?.group_image_prices && Object.keys(record.group_image_prices).length > 0) ||
+    (record?.group_task_prices && Object.keys(record.group_task_prices).length > 0)
+  );
+}
+
 // Render vendor name
 const renderVendor = (vendorName, vendorIcon, t) => {
   if (!vendorName) return '-';
@@ -157,6 +164,9 @@ export const getPricingTableColumns = ({
     title: t('计费类型'),
     dataIndex: 'quota_type',
     render: (text, record, index) => {
+      if (hasTierPricing(record)) {
+        return renderQuotaType(1, t);
+      }
       return renderQuotaType(parseInt(text), t);
     },
     sorter: (a, b) => a.quota_type - b.quota_type,

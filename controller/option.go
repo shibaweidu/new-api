@@ -151,6 +151,24 @@ func UpdateOption(c *gin.Context) {
 			})
 			return
 		}
+	case "GroupImageModelPrice":
+		err = ratio_setting.UpdateGroupImageModelPriceByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "图片分组价格设置失败: " + err.Error(),
+			})
+			return
+		}
+	case "GroupTaskModelPrice":
+		err = ratio_setting.UpdateGroupTaskModelPriceByJSONString(option.Value.(string))
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "任务分组价格设置失败: " + err.Error(),
+			})
+			return
+		}
 	case "AudioRatio":
 		err = ratio_setting.UpdateAudioRatioByJSONString(option.Value.(string))
 		if err != nil {

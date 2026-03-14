@@ -609,6 +609,124 @@ export const calculateModelPrice = ({
   currency,
   precision = 4,
 }) => {
+  const getTaskTierPriceData = () => {
+    const allTaskPrices = record?.group_task_prices;
+    if (!allTaskPrices || Object.keys(allTaskPrices).length === 0) {
+      return null;
+    }
+
+    const enabledGroups = Array.isArray(record.enable_groups)
+      ? record.enable_groups.filter(Boolean)
+      : [];
+    const pickGroupPrices = (group) =>
+      allTaskPrices[group] || allTaskPrices.default || null;
+
+    const groupsToEvaluate =
+      selectedGroup && selectedGroup !== 'all'
+        ? [selectedGroup]
+        : Array.from(
+            new Set([
+              ...enabledGroups,
+              ...Object.keys(allTaskPrices).filter((group) => group !== 'default'),
+              ...(allTaskPrices.default ? ['default'] : []),
+            ]),
+          );
+
+    let minimumPrice = Number.POSITIVE_INFINITY;
+    let minimumGroup = selectedGroup;
+
+    groupsToEvaluate.forEach((group) => {
+      const prices = pickGroupPrices(group);
+      if (!prices || Object.keys(prices).length === 0) return;
+
+      const ratio = groupRatio?.[group] ?? 1;
+      Object.values(prices).forEach((price) => {
+        const finalPrice = (Number(price) || 0) * ratio;
+        if (finalPrice < minimumPrice) {
+          minimumPrice = finalPrice;
+          minimumGroup = group;
+        }
+      });
+    });
+
+    if (!Number.isFinite(minimumPrice)) {
+      return null;
+    }
+
+    return {
+      price: displayPrice(minimumPrice),
+      isPerToken: false,
+      isTaskTierPrice: true,
+      priceLabel: '最低价格',
+      usedGroup: minimumGroup,
+      usedGroupRatio: groupRatio?.[minimumGroup] ?? 1,
+    };
+  };
+
+  const taskTierPriceData = getTaskTierPriceData();
+  if (taskTierPriceData) {
+    return taskTierPriceData;
+  }
+
+  const getImageTierPriceData = () => {
+    const allTierPrices = record?.group_image_prices;
+    if (!allTierPrices || Object.keys(allTierPrices).length === 0) {
+      return null;
+    }
+
+    const enabledGroups = Array.isArray(record.enable_groups)
+      ? record.enable_groups.filter(Boolean)
+      : [];
+    const pickGroupPrices = (group) =>
+      allTierPrices[group] || allTierPrices.default || null;
+
+    const groupsToEvaluate =
+      selectedGroup && selectedGroup !== 'all'
+        ? [selectedGroup]
+        : Array.from(
+            new Set([
+              ...enabledGroups,
+              ...Object.keys(allTierPrices).filter((group) => group !== 'default'),
+              ...(allTierPrices.default ? ['default'] : []),
+            ]),
+          );
+
+    let minimumPrice = Number.POSITIVE_INFINITY;
+    let minimumGroup = selectedGroup;
+
+    groupsToEvaluate.forEach((group) => {
+      const prices = pickGroupPrices(group);
+      if (!prices || Object.keys(prices).length === 0) return;
+
+      const ratio = groupRatio?.[group] ?? 1;
+      Object.values(prices).forEach((price) => {
+        const finalPrice = (Number(price) || 0) * ratio;
+        if (finalPrice < minimumPrice) {
+          minimumPrice = finalPrice;
+          minimumGroup = group;
+        }
+      });
+    });
+
+    if (!Number.isFinite(minimumPrice)) {
+      return null;
+    }
+
+    return {
+      price: displayPrice(minimumPrice),
+      isPerToken: false,
+      isImageTierPrice: true,
+      priceLabel: '最低价格',
+      usedGroup: minimumGroup,
+      usedGroupRatio: groupRatio?.[minimumGroup] ?? 1,
+    };
+  };
+
+  const imageTierPriceData = getImageTierPriceData();
+  if (imageTierPriceData) {
+    return imageTierPriceData;
+  }
+
   // 1. 选择实际使用的分组
   let usedGroup = selectedGroup;
   let usedGroupRatio = groupRatio[selectedGroup];
@@ -720,7 +838,7 @@ export const formatPriceInfo = (priceData, t) => {
   return (
     <>
       <span style={{ color: 'var(--semi-color-text-1)' }}>
-        {t('模型价格')} {priceData.price}
+        {t(priceData.priceLabel || '模型价格')} {priceData.price}
       </span>
     </>
   );

@@ -152,13 +152,17 @@ const PricingCardView = ({
 
   // 渲染标签
   const renderTags = (record) => {
+    const hasImageTierPrice =
+      record?.group_image_prices && Object.keys(record.group_image_prices).length > 0;
+    const hasTaskTierPrice =
+      record?.group_task_prices && Object.keys(record.group_task_prices).length > 0;
     // 计费类型标签（左边）
     let billingTag = (
       <Tag key='billing' shape='circle' color='white' size='small'>
         -
       </Tag>
     );
-    if (record.quota_type === 1) {
+    if (hasImageTierPrice || hasTaskTierPrice || record.quota_type === 1) {
       billingTag = (
         <Tag key='billing' shape='circle' color='teal' size='small'>
           {t('按次计费')}
