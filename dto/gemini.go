@@ -161,8 +161,8 @@ func (r *GeminiChatRequest) GetTokenCountMeta() *types.TokenCountMeta {
 		if meta.ImageSize == "" {
 			meta.ImageSize = "1024x1024"
 		}
-		if r.GenerationConfig.CandidateCount > 0 {
-			meta.ImageCount = r.GenerationConfig.CandidateCount
+		if r.GenerationConfig.CandidateCount != nil && *r.GenerationConfig.CandidateCount > 0 {
+			meta.ImageCount = *r.GenerationConfig.CandidateCount
 		} else {
 			meta.ImageCount = 1
 		}

@@ -128,8 +128,8 @@ func (i *ImageRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	var sizeRatio = 1.0
 	var qualityRatio = 1.0
 	imageCount := 1
-	if i.N > 0 {
-		imageCount = int(i.N)
+	if i.N != nil && *i.N > 0 {
+		imageCount = int(*i.N)
 	}
 	imageSize := strings.ToLower(strings.TrimSpace(i.Size))
 	if imageSize == "" {
@@ -157,10 +157,6 @@ func (i *ImageRequest) GetTokenCountMeta() *types.TokenCountMeta {
 	}
 
 	// not support token count for dalle
-	n := uint(1)
-	if i.N != nil {
-		n = *i.N
-	}
 	return &types.TokenCountMeta{
 		CombineText:     i.Prompt,
 		MaxTokens:       1584,

@@ -193,7 +193,8 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		}
 	}
 	if info.PriceData.UsePrice && info.PriceData.ModelPrice > 0 {
-		modelPrice = info.PriceData.ModelPrice
+		priceData.ModelPrice = info.PriceData.ModelPrice
+		priceData.UsePrice = true
 	}
 
 	// 6. 将 OtherRatios 应用到基础额度
