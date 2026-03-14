@@ -107,7 +107,16 @@ export const getRedemptionsColumns = ({
     {
       title: t('额度'),
       dataIndex: 'quota',
-      render: (text) => {
+      render: (text, record) => {
+        if (record.subscription_plan_id > 0) {
+          return (
+            <div>
+              <Tag color='blue' shape='circle'>
+                {t('订阅套餐')}
+              </Tag>
+            </div>
+          );
+        }
         return (
           <div>
             <Tag color='grey' shape='circle'>

@@ -23,6 +23,8 @@ import {
   Button,
   Card,
   Divider,
+  Input,
+  Modal,
   Select,
   Skeleton,
   Space,
@@ -89,6 +91,9 @@ const SubscriptionPlansCard = ({
   const [paying, setPaying] = useState(false);
   const [selectedEpayMethod, setSelectedEpayMethod] = useState('');
   const [refreshing, setRefreshing] = useState(false);
+  const [redeemOpen, setRedeemOpen] = useState(false);
+  const [redeemCode, setRedeemCode] = useState('');
+  const [redeemLoading, setRedeemLoading] = useState(false);
 
   const epayMethods = useMemo(() => getEpayMethods(payMethods), [payMethods]);
 
@@ -195,6 +200,34 @@ const SubscriptionPlansCard = ({
       showError(t('支付请求失败'));
     } finally {
       setPaying(false);
+    }
+  };
+
+  const handleRedeem = async () => {
+    if (!redeemCode.trim()) {
+      showError(t('请输入兑换码！'));
+      return;
+    }
+    setRedeemLoading(true);
+    try {
+      const res = await API.post('/api/user/topup', { key: redeemCode.trim() });
+      const { success, message, data } = res.data;
+      if (success) {
+        if (data && data.subscription_plan_id > 0) {
+          showSuccess(t('成功激活订阅套餐：') + data.plan_title);
+        } else {
+          showSuccess(t('兑换成功！'));
+        }
+        setRedeemCode('');
+        setRedeemOpen(false);
+        reloadSubscriptionSelf?.();
+      } else {
+        showError(message);
+      }
+    } catch (e) {
+      showError(t('请求失败'));
+    } finally {
+      setRedeemLoading(false);
     }
   };
 
@@ -628,6 +661,18 @@ const SubscriptionPlansCard = ({
                             buttonEl
                           );
                         })()}
+                        <Button
+                          theme='light'
+                          type='tertiary'
+                          block
+                          className='mt-2'
+                          onClick={() => {
+                            setRedeemCode('');
+                            setRedeemOpen(true);
+                          }}
+                        >
+                          {t('兑换套餐')}
+                        </Button>
                       </div>
                     </div>
                   </Card>
@@ -677,6 +722,35 @@ const SubscriptionPlansCard = ({
         onPayCreem={payCreem}
         onPayEpay={payEpay}
       />
+
+      {/* 兑换码弹窗 */}
+      <Modal
+        title={t('兑换套餐')}
+        visible={redeemOpen}
+        onCancel={() => setRedeemOpen(false)}
+        centered
+        footer={
+          <Button
+            theme='solid'
+            type='primary'
+            block
+            loading={redeemLoading}
+            onClick={handleRedeem}
+          >
+            {t('兑换')}
+          </Button>
+        }
+      >
+        <Input
+          placeholder={t('请输入兑换码')}
+          value={redeemCode}
+          onChange={setRedeemCode}
+          onEnterPress={handleRedeem}
+          size='large'
+          showClear
+          autofocus
+        />
+      </Modal>
     </>
   );
 };

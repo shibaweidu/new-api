@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"unicode/utf8"
@@ -81,16 +82,24 @@ func AddRedemption(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
 		return
 	}
+	if redemption.SubscriptionPlanId > 0 {
+		plan, err := model.GetSubscriptionPlanById(redemption.SubscriptionPlanId)
+		if err != nil || plan == nil {
+			common.ApiError(c, fmt.Errorf("subscription plan not found: %d", redemption.SubscriptionPlanId))
+			return
+		}
+	}
 	var keys []string
 	for i := 0; i < redemption.Count; i++ {
 		key := common.GetUUID()
 		cleanRedemption := model.Redemption{
-			UserId:      c.GetInt("id"),
-			Name:        redemption.Name,
-			Key:         key,
-			CreatedTime: common.GetTimestamp(),
-			Quota:       redemption.Quota,
-			ExpiredTime: redemption.ExpiredTime,
+			UserId:             c.GetInt("id"),
+			Name:               redemption.Name,
+			Key:                key,
+			CreatedTime:        common.GetTimestamp(),
+			Quota:              redemption.Quota,
+			ExpiredTime:        redemption.ExpiredTime,
+			SubscriptionPlanId: redemption.SubscriptionPlanId,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
@@ -148,6 +157,7 @@ func UpdateRedemption(c *gin.Context) {
 		cleanRedemption.Name = redemption.Name
 		cleanRedemption.Quota = redemption.Quota
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
+		cleanRedemption.SubscriptionPlanId = redemption.SubscriptionPlanId
 	}
 	if statusOnly != "" {
 		cleanRedemption.Status = redemption.Status
