@@ -376,3 +376,52 @@ func RechargeCreem(referenceId string, customerEmail string, customerName string
 
 	return nil
 }
+
+func RechargeWaffo(tradeNo string) (err error) {
+	if tradeNo == "" {
+		return errors.New("未提供支付单号")
+	}
+
+	var quota int64
+	topUp := &TopUp{}
+
+	refCol := "`trade_no`"
+	if common.UsingPostgreSQL {
+		refCol = `"trade_no"`
+	}
+
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		err := tx.Set("gorm:query_option", "FOR UPDATE").Where(refCol+" = ?", tradeNo).First(topUp).Error
+		if err != nil {
+			return errors.New("充值订单不存在")
+		}
+
+		if topUp.Status != common.TopUpStatusPending {
+			return errors.New("充值订单状态错误")
+		}
+
+		topUp.CompleteTime = common.GetTimestamp()
+		topUp.Status = common.TopUpStatusSuccess
+		err = tx.Save(topUp).Error
+		if err != nil {
+			return err
+		}
+
+		quota = topUp.Amount
+		err = tx.Model(&User{}).Where("id = ?", topUp.UserId).Update("quota", gorm.Expr("quota + ?", quota)).Error
+		if err != nil {
+			return err
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		common.SysError("waffo topup failed: " + err.Error())
+		return errors.New("充值失败，请稍后重试")
+	}
+
+	RecordLog(topUp.UserId, LogTypeTopup, fmt.Sprintf("使用Waffo充值成功，充值额度: %v，支付金额：%.2f", quota, topUp.Money))
+
+	return nil
+}
