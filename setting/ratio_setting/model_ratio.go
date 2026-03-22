@@ -2,6 +2,7 @@ package ratio_setting
 
 import (
 	"strings"
+	"sync"
 
 	"github.com/QuantumNous/new-api/common"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
