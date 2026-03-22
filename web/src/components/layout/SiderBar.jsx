@@ -27,6 +27,8 @@ import { useSidebar } from '../../hooks/common/useSidebar';
 import { useMinimumLoadingTime } from '../../hooks/common/useMinimumLoadingTime';
 import { isAdmin, isRoot, showError } from '../../helpers';
 import SkeletonWrapper from './components/SkeletonWrapper';
+import { StatusContext } from '../../context/Status';
+import { useContext } from 'react';
 
 import { Nav, Divider, Button } from '@douyinfe/semi-ui';
 
@@ -53,6 +55,7 @@ const routerMap = {
 
 const SiderBar = ({ onNavigate = () => {} }) => {
   const { t } = useTranslation();
+  const [statusState] = useContext(StatusContext);
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
   const {
     isModuleVisible,
@@ -130,6 +133,12 @@ const SiderBar = ({ onNavigate = () => {} }) => {
         to: '/topup',
       },
       {
+        text: t('兑换码购买'),
+        itemKey: 'redemption_shop',
+        to: null,
+        externalLink: statusState?.status?.redemption_shop_link || '',
+      },
+      {
         text: t('个人设置'),
         itemKey: 'personal',
         to: '/personal',
@@ -139,11 +148,15 @@ const SiderBar = ({ onNavigate = () => {} }) => {
     // 根据配置过滤项目
     const filteredItems = items.filter((item) => {
       const configVisible = isModuleVisible('personal', item.itemKey);
+      // 兑换码购买：还需要有链接才显示
+      if (item.itemKey === 'redemption_shop') {
+        return configVisible && !!item.externalLink;
+      }
       return configVisible;
     });
 
     return filteredItems;
-  }, [t, isModuleVisible]);
+  }, [t, isModuleVisible, statusState?.status?.redemption_shop_link]);
 
   const adminItems = useMemo(() => {
     const items = [
@@ -410,6 +423,25 @@ const SiderBar = ({ onNavigate = () => {} }) => {
           hoverStyle='sidebar-nav-item:hover'
           selectedStyle='sidebar-nav-item-selected'
           renderWrapper={({ itemElement, props }) => {
+            // 兑换码购买：打开外部链接
+            if (props.itemKey === 'redemption_shop') {
+              const link = statusState?.status?.redemption_shop_link;
+              if (link) {
+                return (
+                  <a
+                    href={link}
+                    target='_blank'
+                    rel='noopener noreferrer'
+                    style={{ textDecoration: 'none' }}
+                    onClick={onNavigate}
+                  >
+                    {itemElement}
+                  </a>
+                );
+              }
+              return itemElement;
+            }
+
             const to =
               routerMapState[props.itemKey] || routerMap[props.itemKey];
 

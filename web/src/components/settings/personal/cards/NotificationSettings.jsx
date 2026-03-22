@@ -280,6 +280,11 @@ const NotificationSettings = ({
       modules: [
         { key: 'topup', title: t('钱包管理'), description: t('余额充值管理') },
         {
+          key: 'redemption_shop',
+          title: t('兑换码购买'),
+          description: t('兑换码购买链接入口'),
+        },
+        {
           key: 'personal',
           title: t('个人设置'),
           description: t('个人信息设置'),
